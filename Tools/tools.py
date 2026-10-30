@@ -9,8 +9,9 @@ import requests
 def web_search_tool(query: str) -> str:
     """Search the web for a query and return the results."""
     tavily_client = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
-    response = tavily_client.search(query)
-    return f"Results for '{query}': {response}"
+    response = tavily_client.search(query,max_results=5)
+    return "\n\n".join(f"Title: {result['title']}\nURL: {result['url']}\n Content: {result['content'][:500]}..." for result in response['results'])
+
 
 
 def web_scraper_tool(url: str) -> str:
