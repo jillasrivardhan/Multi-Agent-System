@@ -8,5 +8,6 @@ langchain-groq
 python-dotenv
 streamlit
 
-tavily
+rich
+tavily-python
 beautifulsoup4
