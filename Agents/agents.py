@@ -1,50 +1,77 @@
-
-
-from click import prompt
 from langchain.agents import create_agent
 from langchain_groq import ChatGroq
-from langchain.tools import tool
-from Tools.tools import web_search_tool, web_scraper_tool
-from Prompts.prompts import prompt
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from tools import web_search , scrape_url 
+from dotenv import load_dotenv
+
+load_dotenv()
+
+#model setup 
+llm = ChatGroq(model = "gpt-4o-mini",temperature=0)
 
 
-llm = ChatGroq(
-    model="openai/gpt-oss-120b",
-    temperature=0.7,
+#1st agent 
+def build_search_agent():
+    return create_agent(
+        model = llm,
+        tools= [web_search]
     )
 
-web_search_agent = create_agent(
-    model=llm,
-    tools = [web_search_tool],
-    system_prompt=prompt,
-)
+#2nd agent 
 
-web_scraper_agent = create_agent(
-    model=llm,
-    tools = [web_scraper_tool],
-    system_prompt=prompt,
-)
+def build_reader_agent():
+    return create_agent(
+        model = llm,
+        tools = [scrape_url]
+    )
 
-def web_search(query: str) -> str:
-    """
-    Perform a web search using the web_search_agent.
 
-    Args:
-        query (str): The search query.
+#writer chain 
 
-    Returns:
-        str: The search results.
-    """
-    return web_search_agent.invoke({"messages": [{"role": "user", "content": query}]}).content
+writer_prompt = ChatPromptTemplate.from_messages([
+    ("system", "You are an expert research writer. Write clear, structured and insightful reports."),
+    ("human", """Write a detailed research report on the topic below.
 
-def web_scraper(url: str) -> str:
-    """
-    Scrape a website using the web_scraper_agent.
+Topic: {topic}
 
-    Args:
-        url (str): The URL of the website to scrape.
+Research Gathered:
+{research}
 
-    Returns:
-        str: The scraped content.
-    """
-    return web_scraper_agent.invoke({"messages": [{"role": "user", "content": url}]}).content
+Structure the report as:
+- Introduction
+- Key Findings (minimum 3 well-explained points)
+- Conclusion
+- Sources (list all URLs found in the research)
+
+Be detailed, factual and professional."""),
+])
+
+writer_chain = writer_prompt | llm | StrOutputParser()
+
+#critic_chain 
+
+critic_prompt = ChatPromptTemplate.from_messages([
+     ("system", "You are a sharp and constructive research critic. Be honest and specific."),
+    ("human", """Review the research report below and evaluate it strictly.
+
+Report:
+{report}
+
+Respond in this exact format:
+
+Score: X/10
+
+Strengths:
+- ...
+- ...
+
+Areas to Improve:
+- ...
+- ...
+
+One line verdict:
+..."""),
+])
+
+critic_chain = critic_prompt | llm | StrOutputParser()
