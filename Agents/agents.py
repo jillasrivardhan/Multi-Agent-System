@@ -1,4 +1,4 @@
-from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from dotenv import load_dotenv
@@ -8,14 +8,17 @@ load_dotenv()
 
 
 # Model setup
-llm = ChatGroq(
-    model=os.getenv(
-        "GROQ_API_KEY",
-        "openai/gpt-oss-120b"
-    ),
-    temperature=0
-)
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY not found in .env file")
+
+llm = ChatGoogleGenerativeAI(
+    model="gemini-3.8-flash",
+    google_api_key=GEMINI_API_KEY,
+    temperature=0,
+    max_output_tokens=4096
+)
 
 # --------------------------------------------------
 # 1. SEARCH AGENT
