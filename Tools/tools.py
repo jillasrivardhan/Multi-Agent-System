@@ -1,36 +1,114 @@
-from langchain.tools import tool 
-import requests
-from bs4 import BeautifulSoup
+from langchain.tools import tool
+from pydantic import BaseModel, Field
 from tavily import TavilyClient
-import os 
+from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from rich import print
+import requests
+import os
+
 load_dotenv()
 
-tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+# Tavily client
+api_key = os.getenv("TAVILY_API_KEY")
 
-@tool
-def web_search(query : str) -> str:
-    """Search the web for recent and reliable information on a topic . Returns Titles , URLs and snippets."""
-    results = tavily.search(query=query,max_results=5)
+if not api_key:
+    raise ValueError("TAVILY_API_KEY is missing from .env")
 
-    out = []
+tavily = TavilyClient(api_key=api_key)
 
-    for r in results['results']:
-        out.append(
-            f"Title: {r['title']}\nURL: {r['url']}\nSnippet: {r['content'][:300]}\n"
-        )
-    
-    return "\n----\n".join(out)
 
-@tool
-def scrape_url(url: str) -> str:
-    """Scrape and return clean text content from a given URL for deeper reading."""
+# Search tool input schema
+class WebSearchInput(BaseModel):
+    query: str = Field(
+        description="A single complete web search query."
+    )
+
+
+# Scraper tool input schema
+class ScrapeURLInput(BaseModel):
+    url: str = Field(
+        description="A complete HTTP or HTTPS webpage URL."
+    )
+
+
+@tool(args_schema=WebSearchInput)
+def web_search(query: str) -> str:
+    """
+    Search the web using Tavily.
+    Returns titles, URLs and relevant snippets.
+    """
+
     try:
-        resp = requests.get(url, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for tag in soup(["script", "style", "nav", "footer"]):
-            tag.decompose()
-        return soup.get_text(separator=" ", strip=True)[:3000]
+        results = tavily.search(
+            query=query,
+            search_depth="advanced",
+            max_results=5
+        )
+
+        output = []
+
+        for item in results.get("results", []):
+
+            output.append(
+                f"Title: {item.get('title', 'N/A')}\n"
+                f"URL: {item.get('url', 'N/A')}\n"
+                f"Content: {item.get('content', '')[:600]}\n"
+            )
+
+        if not output:
+            return "No search results found."
+
+        return "\n--------------------\n".join(output)
+
     except Exception as e:
-        return f"Could not scrape URL: {str(e)}"
+        return f"Search error: {str(e)}"
+
+
+@tool(args_schema=ScrapeURLInput)
+def scrape_url(url: str) -> str:
+    """
+    Scrape a webpage and return clean text content.
+    """
+
+    try:
+        if not url.startswith(("http://", "https://")):
+            return "Invalid URL provided."
+
+        response = requests.get(
+            url,
+            timeout=15,
+            headers={
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
+
+        response.raise_for_status()
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
+        )
+
+        # Remove unnecessary HTML elements
+        for tag in soup([
+            "script",
+            "style",
+            "nav",
+            "footer",
+            "header",
+            "aside"
+        ]):
+            tag.decompose()
+
+        content = soup.get_text(
+            separator=" ",
+            strip=True
+        )
+
+        return content[:6000]
+
+    except requests.exceptions.RequestException as e:
+        return f"Scraping error: {str(e)}"
+
+    except Exception as e:
+        return f"Unexpected scraping error: {str(e)}"
