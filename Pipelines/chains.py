@@ -1,4 +1,4 @@
-from agents import build_reader_agent , build_search_agent , writer_chain , critic_chain
+from Agents.agents import build_reader_agent , build_search_agent , writer_chain , critic_chain
 
 def run_research_pipeline(topic : str) -> dict:
 
@@ -18,6 +18,7 @@ def run_research_pipeline(topic : str) -> dict:
     print("\n search result ",state['search_results'])
 
     #step 2 - reader agent 
+    
     print("\n"+" ="*50)
     print("step 2 - Reader agent is scraping top resources ...")
     print("="*50)
